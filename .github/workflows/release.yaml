@@ -1,9 +1,10 @@
 name: Progressive Config Management & Secure Release Pipeline
 
 on:
-  # push:
-  #   branches:
-  #     - main
+  push:
+    branches:
+      - main
+      - develop-test
   pull_request:
     types: [closed]
     branches:
@@ -25,7 +26,7 @@ on:
         default: false
         type: boolean
 
-# Step 4: Apply least privilege permissions  
+# Step 4: Apply least privilege permissions
 # 👇 Uncomment in Step 4: Secure Authentication
 # permissions:
 #   contents: read      # Can read repository
@@ -36,7 +37,7 @@ jobs:
   # Stage 1: Configuration Validation (ALWAYS RUNS FIRST)
   validate-configuration:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -50,46 +51,46 @@ jobs:
       - name: Validate Environment Configuration Templates
         run: |
           echo "🔍 Validating environment configuration templates..."
-          
+
           # Generate environment files from templates for validation
           ./deploy/environments/setup-local-env.sh
-          
+
           # Make validation script executable
           chmod +x deploy/scripts/validate_env.sh
-          
+
           # Validate generated environment files
           echo "Validating development environment..."
           ./deploy/scripts/validate_env.sh deploy/environments/.env.dev
-          
+
           echo "Validating template structure..."
           [ -f "deploy/environments/templates/env.dev.template" ] || exit 1
           [ -f "deploy/environments/templates/env.staging.template" ] || exit 1
           [ -f "deploy/environments/templates/env.prod.template" ] || exit 1
-          
+
           echo "✅ All environment templates validated"
 
       - name: Validate Docker Compose Configuration
         run: |
           echo "🔍 Validating Docker Compose configurations..."
-          
+
           # Test development configuration (generated from template)
           docker-compose --env-file deploy/environments/.env.dev config --quiet
           echo "✅ Development config valid"
-          
+
           # For staging/production, create temporary files with placeholder values for validation
           cp deploy/environments/templates/env.staging.template deploy/environments/.env.staging.temp
           sed -i 's/\${[^}]*}/placeholder_value/g' deploy/environments/.env.staging.temp
           docker-compose --env-file deploy/environments/.env.staging.temp config --quiet
           echo "✅ Staging template structure valid"
-          
+
           cp deploy/environments/templates/env.prod.template deploy/environments/.env.prod.temp
           sed -i 's/\${[^}]*}/placeholder_value/g' deploy/environments/.env.prod.temp
           docker-compose --env-file deploy/environments/.env.prod.temp config --quiet
           echo "✅ Production template structure valid"
-          
+
           # Clean up temporary files
           rm -f deploy/environments/.env.*.temp
-          
+
           echo "🎉 All Docker Compose configurations validated"
 
   # Stage 2: Build and Security Scanning
@@ -97,7 +98,7 @@ jobs:
     needs: validate-configuration
     runs-on: ubuntu-latest
     if: ${{ !inputs.skip_tests }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -145,18 +146,18 @@ jobs:
       - name: Run Tests (Development Environment)
         run: |
           echo "🧪 Running tests in isolated development environment..."
-          
+
           # Start services with development config
           docker-compose --env-file deploy/environments/.env.dev up -d db rabbitmq
-          
+
           # Wait for services to be ready
           echo "Waiting for database to be ready..."
           sleep 10
-          
+
           # Run tests
           source venv/bin/activate
           pytest src/tests/ || echo "✅ Tests completed"
-          
+
           # Cleanup
           docker-compose --env-file deploy/environments/.env.dev down
           echo "✅ Development testing completed"
@@ -238,14 +239,14 @@ jobs:
       # - name: Scan Container for Vulnerabilities
       #   run: |
       #     echo "🔍 Scanning container for vulnerabilities..."
-          
+
       #     # Option A: Scan everything (may find system vulnerabilities)
       #     echo "📊 Full vulnerability report:"
-          
+
       #     grype ghcr.io/${{ github.repository }}/kodekloud-records:${{ env.VERSION }} \
       #       --fail-on high \
-      #       --only-fixed 
-          
+      #       --only-fixed
+
       #     echo "✅ Container vulnerability scan completed"
       #     echo "💡 Note: In production, configure scans based on your risk tolerance"
 
@@ -277,14 +278,14 @@ jobs:
       - name: Create Staging Environment Configuration
         run: |
           echo "🔧 Preparing staging deployment configuration..."
-          
+
           # Create staging config from template with GitHub secrets
           cp deploy/environments/templates/env.staging.template deploy/environments/.env.staging.secure
-          
+
           # Replace placeholder variables with actual values
           sed -i "s/\${STAGING_DB_PASSWORD}/${{ secrets.STAGING_DB_PASSWORD || 'placeholder_password' }}/g" deploy/environments/.env.staging.secure
           sed -i "s/\${STAGING_GRAFANA_PASSWORD}/${{ secrets.STAGING_GRAFANA_PASSWORD || 'placeholder_password' }}/g" deploy/environments/.env.staging.secure
-          
+
           echo "✅ Staging configuration prepared with secrets"
           echo "📋 Configuration summary:"
           echo "   Database: $(grep POSTGRES_DB deploy/environments/.env.staging.secure | cut -d'=' -f2)"
@@ -295,32 +296,32 @@ jobs:
         run: |
           echo "🚀 Deploying to Staging Environment"
           echo "Using configuration: deploy/environments/.env.staging.secure"
-          
+
           # Validate configuration before deployment
           chmod +x deploy/scripts/validate_env.sh
           ./deploy/scripts/validate_env.sh deploy/environments/.env.staging.secure
-          
+
           # In production, you would run:
           # docker-compose --env-file deploy/environments/.env.staging.secure up -d
-          
+
           echo "Environment: Staging"
           echo "Database: $(grep POSTGRES_DB deploy/environments/.env.staging.secure | cut -d'=' -f2)"
           echo "Debug Mode: $(grep DEBUG deploy/environments/.env.staging.secure | cut -d'=' -f2)"
           echo "✅ Staging deployment completed"
-          
+
           # Clean up secure file after deployment
           rm -f deploy/environments/.env.staging.secure
 
       - name: Staging Integration Tests
         run: |
           echo "🧪 Running staging integration tests..."
-          
+
           # In production, you would test actual endpoints
           # curl -f http://staging.kodekloud-records.com/health
           # curl -f http://staging.kodekloud-records.com/api/health/database
-          
+
           echo "✅ Health endpoint: OK"
-          echo "✅ Database connectivity: OK"  
+          echo "✅ Database connectivity: OK"
           echo "✅ API endpoints: OK"
           echo "✅ Monitoring dashboards: Active"
           echo "🎉 Staging validation successful"
@@ -360,21 +361,21 @@ jobs:
       - name: Create Production Environment Configuration
         run: |
           echo "🔒 Preparing production deployment configuration..."
-          
+
           # Create production config from template with GitHub secrets
           cp deploy/environments/templates/env.prod.template deploy/environments/.env.prod.secure
-          
+
           # Replace placeholder variables with actual values from GitHub secrets
           sed -i "s/\${PROD_DB_PASSWORD}/${{ secrets.PROD_DB_PASSWORD || 'MISSING_SECRET' }}/g" deploy/environments/.env.prod.secure
           sed -i "s/\${PROD_GRAFANA_PASSWORD}/${{ secrets.PROD_GRAFANA_PASSWORD || 'MISSING_SECRET' }}/g" deploy/environments/.env.prod.secure
-          
+
           # Verify no placeholder values remain for production
           if grep -q "MISSING_SECRET" deploy/environments/.env.prod.secure; then
             echo "❌ Missing required production secrets!"
             echo "Please configure PROD_DB_PASSWORD and PROD_GRAFANA_PASSWORD in GitHub Secrets"
             exit 1
           fi
-          
+
           echo "✅ Production configuration prepared with secrets"
           echo "📋 Configuration summary:"
           echo "   Database: $(grep POSTGRES_DB deploy/environments/.env.prod.secure | cut -d'=' -f2)"
@@ -386,31 +387,31 @@ jobs:
         run: |
           echo "🚀 Deploying to Production Environment"
           echo "Using configuration: deploy/environments/.env.prod.secure"
-          
+
           # Validate configuration before deployment
           chmod +x deploy/scripts/validate_env.sh
           ./deploy/scripts/validate_env.sh deploy/environments/.env.prod.secure
-          
+
           # In production, you would run:
           # docker-compose --env-file deploy/environments/.env.prod.secure up -d
-          
+
           echo "Environment: Production"
           echo "Database: $(grep POSTGRES_DB deploy/environments/.env.prod.secure | cut -d'=' -f2)"
           echo "Debug Mode: $(grep DEBUG deploy/environments/.env.prod.secure | cut -d'=' -f2)"
           echo "Log Level: $(grep LOG_LEVEL deploy/environments/.env.prod.secure | cut -d'=' -f2)"
           echo "✅ Production deployment completed"
-          
+
           # Clean up secure file after deployment
           rm -f deploy/environments/.env.prod.secure
 
       - name: Production Health Check and Monitoring
         run: |
           echo "🏥 Running comprehensive production health checks..."
-          
+
           # In production, you would test actual endpoints
           # curl -f https://kodekloud-records.com/health
           # curl -f https://kodekloud-records.com/api/health/database
-          
+
           echo "✅ Application health: OK"
           echo "✅ Database connection: OK"
           echo "✅ Load balancer: OK"
