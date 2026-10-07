@@ -222,17 +222,23 @@ jobs:
           echo "${{ secrets.REGISTRY_PAT }}" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
           echo "✅ Using secure GitHub token authentication"
 
+      - name: Set lowercase image name
+        run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=ghcr.io/${REPO}/kodekloud-records" >> "$GITHUB_ENV"
+
       - name: Build and tag Docker image
         run: |
-          docker build -t ghcr.io/${{ github.repository }}/kodekloud-records:${{ env.VERSION }} .
-          docker tag ghcr.io/${{ github.repository }}/kodekloud-records:${{ env.VERSION }} ghcr.io/${{ github.repository }}/kodekloud-records:latest
-          echo "🐳 Docker image built: kodekloud-records:${{ env.VERSION }}"
+          docker build -t "${IMAGE_NAME}:${{ env.VERSION }}" .
+          docker tag "${IMAGE_NAME}:${{ env.VERSION }}" "${IMAGE_NAME}:latest"
+          echo "Docker image built: kodekloud-records:${{ env.VERSION }}"
 
       - name: Push Docker image to GitHub Container Registry
         run: |
-          docker push ghcr.io/${{ github.repository }}/kodekloud-records:${{ env.VERSION }}
-          docker push ghcr.io/${{ github.repository }}/kodekloud-records:latest
-          echo "📦 Images pushed to GHCR"
+          docker push "${IMAGE_NAME}:${{ env.VERSION }}"
+          docker push "${IMAGE_NAME}:latest"
+          echo "Images pushed to GHCR"
+
 
       # Step 5: Uncomment to add container vulnerability scanning
       # 👇 Uncomment this section in Step 5: Container Security
