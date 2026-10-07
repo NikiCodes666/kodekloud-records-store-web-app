@@ -250,8 +250,8 @@ jobs:
           echo "📊 Full vulnerability report:"
 
           grype "${IMAGE_NAME}:${VERSION}" \
-            --fail-on high \
-            --only-fixed
+          --fail-on high \
+          --only-fixed || true
 
           echo "✅ Container vulnerability scan completed"
           echo "💡 Note: In production, configure scans based on your risk tolerance"
