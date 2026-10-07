@@ -15,6 +15,6 @@ opentelemetry-instrumentation-celery==0.42b0
 setuptools==78.1.1
 
 # Additional testing dependencies for demos
-pytest==7.4.3
+pytest==9.0.3
 pytest-asyncio==0.21.1
 httpx==0.25.2  # For testing FastAPI
